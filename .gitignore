@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+
+# Dependencias de Composer
+/vendor/
+
+# Archivos temporales y logs
+*.log
+/tmp/
+/cache/
+
+# Configuración local
+config/db.local.php
