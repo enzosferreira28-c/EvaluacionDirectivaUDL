@@ -16,12 +16,15 @@ Este repositorio contiene la arquitectura inicial, el modelo de datos y el motor
 El proyecto utiliza un enfoque seguro aislando la lógica de negocio del directorio expuesto a internet. 
 
 /
-├── app/                  # Controladores, Modelos y Servicios (Motor estadístico e Importador)
-├── config/               # Configuración global y conexión PDO
-├── storage/              # Archivos temporales, caché y Excel subidos (Permisos 755)
-├── vendor/               # Librerías Composer
-├── views/                # Vistas y plantillas HTML para el PDF
-├── .env                  # Variables de entorno (Credenciales de BD)
-└── public_html/          # (O public/) ROOT expuesto a internet.
-    ├── index.php         # Front Controller
-    └── assets/           # CSS, JS, Imágenes y logotipos.
+├──evaluaciondirectiva_app/
+|   ├── app/                  # Controladores, Modelos y Servicios (Motor estadístico e Importador)
+|   ├── config/               # Configuración global y conexión PDO
+|   ├── storage/              # Archivos temporales, caché y Excel subidos (Permisos 755)
+|   ├── vendor/               # Librerías Composer
+|   ├── views/                # Vistas y plantillas HTML para el PDF
+|   └── .env                  # Variables de entorno (Credenciales de BD)
+└── public_html/              # (O public/) ROOT expuesto a internet.
+    └── evaluaciondirectiva      
+        ├── index.php         # Front Controller
+        └── assets/           # CSS, JS, Imágenes y logotipos.
+
