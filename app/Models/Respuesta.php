@@ -164,7 +164,8 @@ class Respuesta
                     p.nombre AS plantel_nombre,
                     p.id_region,
                     reg.nombre AS region_nombre,
-                    l.nombre AS licenciatura_nombre
+                    l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura
                 FROM respuestas_evaluacion r
                 LEFT JOIN directores d ON r.id_director = d.id_director
                 LEFT JOIN planteles p ON r.id_plantel = p.id_plantel
@@ -286,7 +287,8 @@ class Respuesta
                     p.nombre AS plantel_nombre,
                     p.id_region,
                     reg.nombre AS region_nombre,
-                    l.nombre AS licenciatura_nombre
+                    l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura
                 FROM resultados_evaluacion res
                 LEFT JOIN directores d ON res.id_director = d.id_director
                 LEFT JOIN planteles p ON res.id_plantel = p.id_plantel

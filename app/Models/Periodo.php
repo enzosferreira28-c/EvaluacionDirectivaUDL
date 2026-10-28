@@ -23,6 +23,35 @@ class Periodo
     }
 
     /**
+     * Obtiene únicamente el periodo que actualmente está ACTIVO (solo debe haber uno).
+     *
+     * @return array{id_periodo: string, estatus: string, creado_en: string}|null
+     */
+    public static function getActivo(PDO $pdo): ?array
+    {
+        $stmt = $pdo->query("SELECT id_periodo, estatus, creado_en FROM periodos WHERE estatus = 'ACTIVO' ORDER BY creado_en DESC LIMIT 1");
+        $row = $stmt->fetch();
+        return $row !== false ? $row : null;
+    }
+
+    /**
+     * Obtiene los periodos disponibles para importación (aquellos que aún no tienen respuestas cargadas).
+     *
+     * @return array<int, array{id_periodo: string, estatus: string, creado_en: string}>
+     */
+    public static function getPeriodosSinRespuestas(PDO $pdo): array
+    {
+        $sql = "SELECT p.id_periodo, p.estatus, p.creado_en 
+                FROM periodos p
+                LEFT JOIN respuestas_evaluacion r ON p.id_periodo = r.id_periodo
+                WHERE r.id_respuesta IS NULL
+                GROUP BY p.id_periodo, p.estatus, p.creado_en
+                ORDER BY p.creado_en DESC";
+        $stmt = $pdo->query($sql);
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Busca un período por su clave identificadora (ejemplo: '2027-1').
      *
      * @return array{id_periodo: string, estatus: string, creado_en: string}|null
@@ -37,22 +66,83 @@ class Periodo
     }
 
     /**
-     * Crea un nuevo período escolar con estatus 'ACTIVO'.
+     * Crea un nuevo período escolar. 
+     * Al crearlo, si se marca como ACTIVO, desactiva automáticamente todos los anteriores
+     * garantizando que sólo un periodo esté ACTIVO en el sistema.
      */
     public static function create(PDO $pdo, string $id): bool
     {
-        $stmt = $pdo->prepare("INSERT INTO periodos (id_periodo, estatus) VALUES (:id, 'ACTIVO')");
-        return $stmt->execute([':id' => trim($id)]);
+        $cleanId = trim($id);
+        $wasInTransaction = $pdo->inTransaction();
+        if (!$wasInTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            // Desactivar todos los periodos previos para que solo el nuevo quede ACTIVO
+            $pdo->exec("UPDATE periodos SET estatus = 'CERRADO' WHERE estatus = 'ACTIVO'");
+
+            // Insertar el nuevo como ACTIVO
+            $stmt = $pdo->prepare("INSERT INTO periodos (id_periodo, estatus) VALUES (:id, 'ACTIVO')");
+            $res = $stmt->execute([':id' => $cleanId]);
+
+            if (!$wasInTransaction) {
+                $pdo->commit();
+            }
+            return $res;
+        } catch (\Throwable $e) {
+            if (!$wasInTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Activa un periodo específico y desactiva todos los demás (garantizando exclusividad de ACTIVO).
+     */
+    public static function setActivo(PDO $pdo, string $id): bool
+    {
+        $cleanId = trim($id);
+        $wasInTransaction = $pdo->inTransaction();
+        if (!$wasInTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            // Desactivar todos
+            $pdo->exec("UPDATE periodos SET estatus = 'CERRADO'");
+
+            // Activar el seleccionado
+            $stmt = $pdo->prepare("UPDATE periodos SET estatus = 'ACTIVO' WHERE id_periodo = :id");
+            $res = $stmt->execute([':id' => $cleanId]);
+
+            if (!$wasInTransaction) {
+                $pdo->commit();
+            }
+            return $res;
+        } catch (\Throwable $e) {
+            if (!$wasInTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
      * Actualiza el estatus de un período ('ACTIVO' o 'CERRADO').
+     * Si se pasa 'ACTIVO', invoca setActivo para asegurar que solo uno quede activo.
      */
     public static function updateEstatus(PDO $pdo, string $id, string $estatus): bool
     {
+        $cleanEstatus = strtoupper(trim($estatus));
+        if ($cleanEstatus === 'ACTIVO') {
+            return self::setActivo($pdo, $id);
+        }
+
         $stmt = $pdo->prepare('UPDATE periodos SET estatus = :estatus WHERE id_periodo = :id');
         return $stmt->execute([
-            ':estatus' => strtoupper(trim($estatus)),
+            ':estatus' => $cleanEstatus,
             ':id'      => trim($id),
         ]);
     }
@@ -81,6 +171,12 @@ class Periodo
             // Eliminar el período
             $stmtPeriodo = $pdo->prepare('DELETE FROM periodos WHERE id_periodo = :id');
             $result = $stmtPeriodo->execute([':id' => $cleanId]);
+
+            // Si el periodo eliminado era ACTIVO y quedan otros periodos, activar el más reciente
+            $periodoActivo = self::getActivo($pdo);
+            if ($periodoActivo === null) {
+                $pdo->exec("UPDATE periodos SET estatus = 'ACTIVO' ORDER BY creado_en DESC LIMIT 1");
+            }
 
             if (!$wasInTransaction) {
                 $pdo->commit();

@@ -51,7 +51,7 @@ class StatisticsService
                             r.id_director,
                             r.id_plantel,
                             r.id_licenciatura,
-                            COALESCE(d.turno, 'M') AS turno_director,
+                            COALESCE(d.turno, 'T') AS turno_director,
                             COUNT(r.id_respuesta) AS total_encuestas,
                             AVG(r.p1_horario_cubiculo) AS p1_prom,
                             AVG(r.p2_atencion_respetuosa) AS p2_prom,
@@ -242,6 +242,7 @@ class StatisticsService
             $directorNombre = $item2['director_nombre'] ?? $item1['director_nombre'] ?? "Director #{$dirId}";
             $plantelNombre = $item2['plantel_nombre'] ?? $item1['plantel_nombre'] ?? 'N/A';
             $licenciaturaNombre = $item2['licenciatura_nombre'] ?? $item1['licenciatura_nombre'] ?? 'N/A';
+            $licenciaturaNomenclatura = $item2['licenciatura_nomenclatura'] ?? $item1['licenciatura_nomenclatura'] ?? '';
 
             $p1Prom = ($item1 !== null) ? (float)$item1['promedio_global'] : null;
             $p2Prom = ($item2 !== null) ? (float)$item2['promedio_global'] : null;
@@ -265,6 +266,7 @@ class StatisticsService
                 'director' => $directorNombre,
                 'plantel' => $plantelNombre,
                 'licenciatura' => $licenciaturaNombre,
+                'nomenclatura' => $licenciaturaNomenclatura,
                 'periodo1_promedio' => $p1Prom,
                 'periodo2_promedio' => $p2Prom,
                 'diferencia' => $diferencia,
@@ -347,7 +349,8 @@ class StatisticsService
                     TRIM(CONCAT(d.nombre, ' ', d.apellidos)) AS director_nombre,
                     p.nombre AS plantel_nombre,
                     p.id_region,
-                    l.nombre AS licenciatura_nombre
+                    l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura
                 FROM resultados_evaluacion r
                 INNER JOIN directores d ON r.id_director = d.id_director
                 INNER JOIN planteles p ON r.id_plantel = p.id_plantel
@@ -462,7 +465,8 @@ class StatisticsService
                     r.posicion_ranking,
                     TRIM(CONCAT(d.nombre, ' ', d.apellidos)) AS director_nombre,
                     p.nombre AS plantel_nombre,
-                    l.nombre AS licenciatura_nombre
+                    l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura
                 FROM resultados_evaluacion r
                 INNER JOIN directores d ON r.id_director = d.id_director
                 INNER JOIN planteles p ON r.id_plantel = p.id_plantel
@@ -493,7 +497,8 @@ class StatisticsService
                     TRIM(CONCAT(d.nombre, ' ', d.apellidos)) AS director_nombre,
                     p.nombre AS plantel_nombre,
                     p.id_region,
-                    l.nombre AS licenciatura_nombre
+                    l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura
                 FROM resultados_evaluacion r
                 INNER JOIN directores d ON r.id_director = d.id_director
                 INNER JOIN planteles p ON r.id_plantel = p.id_plantel

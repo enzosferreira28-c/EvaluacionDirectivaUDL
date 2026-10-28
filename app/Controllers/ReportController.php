@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Security;
 use App\Models\Catalogo;
 use App\Models\Periodo;
+use App\Services\PdfGeneratorService;
 use App\Services\StatisticsService;
 use PDO;
 
@@ -79,6 +80,46 @@ class ReportController
         ];
 
         require APP_ROOT . '/views/reports/index.php';
+    }
+
+    /**
+     * Genera y descarga el PDF de Resultados Generales por Región
+     */
+    public function pdfRegion(): void
+    {
+        Security::requireAuth();
+
+        $periodoId = isset($_GET['id_periodo']) ? trim((string)$_GET['id_periodo']) : '';
+        $regionId = !empty($_GET['id_region']) ? (int)$_GET['id_region'] : null;
+
+        if ($periodoId === '') {
+            $_SESSION['flash_error'] = 'Debe seleccionar un periodo de evaluación para generar el PDF.';
+            header('Location: ' . url('reportes'));
+            exit;
+        }
+
+        $pdfService = new PdfGeneratorService($this->pdo);
+        $pdfService->generateRegionReport($periodoId, $regionId);
+    }
+
+    /**
+     * Genera y descarga el PDF Detallado con temas P1..P10 por Plantel
+     */
+    public function pdfPlantel(): void
+    {
+        Security::requireAuth();
+
+        $periodoId = isset($_GET['id_periodo']) ? trim((string)$_GET['id_periodo']) : '';
+        $plantelId = !empty($_GET['id_plantel']) ? (int)$_GET['id_plantel'] : 0;
+
+        if ($periodoId === '' || $plantelId <= 0) {
+            $_SESSION['flash_error'] = 'Debe seleccionar un periodo y un plantel para generar el reporte detallado.';
+            header('Location: ' . url('reportes'));
+            exit;
+        }
+
+        $pdfService = new PdfGeneratorService($this->pdo);
+        $pdfService->generatePlantelReport($periodoId, $plantelId);
     }
 
     /**

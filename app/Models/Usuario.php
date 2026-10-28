@@ -68,6 +68,23 @@ class Usuario
     }
 
     /**
+     * Actualiza la contraseña de un usuario en la base de datos.
+     */
+    public static function updatePassword(PDO $pdo, int $id, string $passwordHash): bool
+    {
+        $stmt = $pdo->prepare(
+            'UPDATE usuarios 
+             SET password_hash = :password_hash 
+             WHERE id_usuario = :id'
+        );
+
+        return $stmt->execute([
+            ':password_hash' => $passwordHash,
+            ':id'            => $id,
+        ]);
+    }
+
+    /**
      * Obtiene el listado completo de usuarios registrados.
      *
      * @return array<int, array<string, mixed>>

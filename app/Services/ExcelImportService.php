@@ -212,11 +212,9 @@ class ExcelImportService
                         continue;
                     }
 
-                    // Asignación de Director según el turno del alumno
-                    // Turno estudiante M o D -> Director 'M' (Matutino)
-                    // Turno estudiante V o N -> Director 'T' (Tarde / Vespertino)
-                    $directorTurno = ($studentTurn === 'M' || $studentTurn === 'D') ? 'M' : 'T';
-                    $directorId = $this->getDirectorId($plantelId, $licenciaturaId, $directorTurno);
+                    // Asignación de Director según el turno del estudiante (M, D, V, N)
+                    // Se busca coincidencia específica por turno, luego 'T' (Todas) y finalmente director activo del plantel/carrera
+                    $directorId = $this->getDirectorId($plantelId, $licenciaturaId, $studentTurn);
 
                     $batchRows[] = [
                         'id_periodo' => $periodoId,
@@ -549,35 +547,17 @@ class ExcelImportService
     }
 
     /**
-     * Obtiene el ID del director a partir del plantel, licenciatura y turno consolidado ('M' o 'T').
+     * Obtiene el ID del director a partir del plantel, licenciatura y turno del estudiante.
      */
-    private function getDirectorId(int $plantelId, int $licenciaturaId, string $turnoConsolidado): ?int
+    private function getDirectorId(int $plantelId, int $licenciaturaId, string $studentTurn): ?int
     {
-        $cacheKey = "{$plantelId}_{$licenciaturaId}_{$turnoConsolidado}";
+        $cleanTurn = strtoupper(trim($studentTurn));
+        $cacheKey = "{$plantelId}_{$licenciaturaId}_{$cleanTurn}";
         if (array_key_exists($cacheKey, $this->directorCache)) {
             return $this->directorCache[$cacheKey];
         }
 
-        $id = null;
-        if (class_exists(Catalogo::class) && method_exists(Catalogo::class, 'findDirector')) {
-            $id = Catalogo::findDirector($this->pdo, $plantelId, $licenciaturaId, $turnoConsolidado);
-        } else {
-            $stmt = $this->pdo->prepare(
-                "SELECT id_director FROM directores 
-                 WHERE id_plantel = :plantel 
-                   AND id_licenciatura = :licenciatura 
-                   AND turno = :turno 
-                   AND estatus = 'ACTIVO' 
-                 LIMIT 1"
-            );
-            $stmt->execute([
-                'plantel' => $plantelId,
-                'licenciatura' => $licenciaturaId,
-                'turno' => $turnoConsolidado,
-            ]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $id = $row ? (int)$row['id_director'] : null;
-        }
+        $id = Catalogo::findDirector($this->pdo, $plantelId, $licenciaturaId, $cleanTurn);
 
         $this->directorCache[$cacheKey] = $id;
         return $id;

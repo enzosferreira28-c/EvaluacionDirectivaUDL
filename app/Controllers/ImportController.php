@@ -20,16 +20,21 @@ class ImportController
 
     /**
      * Muestra la interfaz para la carga e importación del archivo de encuestas.
+     * Solo lista aquellos periodos que aún no tienen respuestas procesadas.
      */
     public function showForm(): void
     {
         Security::requireAuth();
 
-        $periodos = Periodo::getAll($this->pdo);
+        // Obtener únicamente periodos que no tienen respuestas previas
+        $periodosDisponibles = Periodo::getPeriodosSinRespuestas($this->pdo);
+
+        $selectedPeriodo = isset($_GET['id_periodo']) ? trim((string)$_GET['id_periodo']) : '';
 
         $pageTitle = 'Importar Encuestas Excel - Evaluación Directiva';
         $data = [
-            'periodos' => $periodos
+            'periodos' => $periodosDisponibles,
+            'selected_periodo' => $selectedPeriodo
         ];
 
         require APP_ROOT . '/views/panel/import.php';
@@ -67,6 +72,15 @@ class ImportController
             echo json_encode([
                 'success' => false,
                 'message' => 'El periodo seleccionado no existe en el sistema.'
+            ]);
+            return;
+        }
+
+        // VALIDACIÓN: Comprobar si el periodo ya cuenta con respuestas previas
+        if (Periodo::hasRespuestas($this->pdo, $periodoId)) {
+            echo json_encode([
+                'success' => false,
+                'message' => "El periodo '{$periodoId}' ya cuenta con encuestas cargadas previamente. Para volver a importar, debe limpiar o eliminar el periodo desde el módulo de Periodos."
             ]);
             return;
         }
@@ -132,7 +146,6 @@ class ImportController
             }
         }
 
-        $sanitizedBase = preg_replace('/[^a-zA-Z0-9_\.-]/', '_', pathinfo($fileName, PATHINFO_FILENAME));
         $newFileName = 'encuestas_' . $periodoId . '_' . date('Ymd_His') . '_' . uniqid() . '.' . $fileExtension;
         $destinationPath = $uploadDirectory . '/' . $newFileName;
 

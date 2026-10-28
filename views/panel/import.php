@@ -1,22 +1,26 @@
 <?php
 declare(strict_types=1);
 
-$pageTitle = 'Importar Encuestas Excel - Evaluación Directiva';
+$pageTitle = 'Importar Encuestas Excel - Universidad de León';
 require APP_ROOT . '/views/layouts/header.php';
 
 $periodos = $data['periodos'] ?? [];
+$selectedPeriodo = (string)($data['selected_periodo'] ?? '');
 ?>
 
 <div class="max-w-4xl mx-auto space-y-6">
 
-    <!-- Header Section -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 border-b border-slate-200">
+    <!-- Header Section (Estilo UDL) -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-200">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-800">Carga y Procesamiento de Encuestas</h1>
-            <p class="text-sm text-slate-500 mt-1">Importe las respuestas de los alumnos desde una hoja de cálculo Excel (.xlsx / .xls)</p>
+            <h1 class="text-2xl font-bold tracking-tight text-[#0f392b] flex items-center space-x-2.5">
+                <i class="fa-solid fa-cloud-arrow-up text-udl-green"></i>
+                <span>Carga y Procesamiento de Encuestas</span>
+            </h1>
+            <p class="text-xs text-slate-500 mt-1">Importe las respuestas de los alumnos desde una hoja de cálculo Excel (.xlsx / .xls)</p>
         </div>
         <div class="mt-3 sm:mt-0">
-            <a href="<?= htmlspecialchars(url('periodos')) ?>" class="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition">
+            <a href="<?= htmlspecialchars(url('periodos')) ?>" class="inline-flex items-center space-x-2 text-xs font-bold text-udl-green hover:text-udl-dark bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 rounded-lg transition shadow-sm">
                 <i class="fa-solid fa-plus"></i>
                 <span>Nuevo Periodo</span>
             </a>
@@ -24,18 +28,21 @@ $periodos = $data['periodos'] ?? [];
     </div>
 
     <!-- Instructions Banner -->
-    <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs sm:text-sm flex items-start space-x-3">
-        <i class="fa-solid fa-circle-info text-blue-500 text-lg mt-0.5 flex-shrink-0"></i>
+    <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[#0f392b] text-xs sm:text-sm flex items-start space-x-3 shadow-sm">
+        <i class="fa-solid fa-circle-info text-udl-green text-lg mt-0.5 flex-shrink-0"></i>
         <div class="space-y-1">
-            <p class="font-semibold text-blue-950">Estructura del archivo requerida:</p>
-            <p class="text-blue-800 leading-relaxed">
-                El archivo debe contener las columnas: <em>Marca temporal, Plantel, Grupo, Licenciatura, y las 10 preguntas evaluativas (P1 a P10)</em>. La primera fila se interpretará como encabezados y será omitida de los cálculos.
+            <p class="font-bold text-[#0f392b]">Estructura del archivo requerida:</p>
+            <p class="text-slate-700 leading-relaxed">
+                El archivo debe contener las columnas: <em>Marca temporal, Plantel, Grupo, Licenciatura, y las 10 preguntas evaluativas (P1 a P10)</em>. La primera fila se interpretará como encabezados y los directores serán asignados automáticamente según el catálogo institucional.
+            </p>
+            <p class="text-[11px] text-amber-800 font-semibold pt-1">
+                <i class="fa-solid fa-shield-halved mr-1 text-amber-600"></i> Solo se muestran los periodos que aún no tienen un Excel procesado. No es posible duplicar cargas en un mismo periodo.
             </p>
         </div>
     </div>
 
     <!-- Main Import Form Card -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
+    <div class="bg-white rounded-xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
         <form id="importForm" method="POST" enctype="multipart/form-data" class="space-y-6">
             <?= \App\Core\Security::csrfField() ?>
 
@@ -45,16 +52,25 @@ $periodos = $data['periodos'] ?? [];
                     1. Seleccione el Periodo de Evaluación <span class="text-rose-500">*</span>
                 </label>
                 <?php if (empty($periodos)): ?>
-                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center justify-between">
-                        <span>No hay periodos creados. Debe crear un periodo antes de poder cargar encuestas.</span>
-                        <a href="<?= htmlspecialchars(url('periodos')) ?>" class="font-bold underline ml-2">Crear Periodo</a>
+                    <div class="p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+                        <div class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600 text-base"></i>
+                            <span>Todos los periodos existentes ya cuentan con un archivo Excel cargado o no hay periodos creados.</span>
+                        </div>
+                        <a href="<?= htmlspecialchars(url('periodos')) ?>" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold transition">
+                            <i class="fa-solid fa-calendar-plus text-xs"></i>
+                            <span>Crear Nuevo Periodo</span>
+                        </a>
                     </div>
                 <?php else: ?>
-                    <select name="id_periodo" id="id_periodo" required class="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                        <option value="">-- Seleccione un ciclo académico --</option>
-                        <?php foreach ($periodos as $p): ?>
-                            <option value="<?= htmlspecialchars((string)$p['id_periodo']) ?>">
-                                <?= htmlspecialchars((string)$p['id_periodo']) ?> (<?= htmlspecialchars((string)($p['estatus'] ?? 'ACTIVO')) ?>)
+                    <select name="id_periodo" id="id_periodo" required class="block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-udl-green focus:border-udl-green transition">
+                        <option value="">-- Seleccione un ciclo académico disponible --</option>
+                        <?php foreach ($periodos as $p): 
+                            $idP = (string)$p['id_periodo'];
+                            $estatus = (string)($p['estatus'] ?? 'ACTIVO');
+                        ?>
+                            <option value="<?= htmlspecialchars($idP) ?>" <?= $selectedPeriodo === $idP ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($idP) ?> (<?= htmlspecialchars($estatus) ?> - Sin archivo cargado)
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -66,15 +82,15 @@ $periodos = $data['periodos'] ?? [];
                 <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                     2. Seleccione el Archivo Excel (.xlsx / .xls) <span class="text-rose-500">*</span>
                 </label>
-                <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-6 sm:p-8 text-center bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer">
-                    <input type="file" name="archivo_excel" id="archivo_excel" accept=".xlsx, .xls" required class="hidden">
+                <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-udl-green rounded-xl p-6 sm:p-8 text-center bg-slate-50/50 hover:bg-emerald-50/20 transition-all cursor-pointer">
+                    <input type="file" name="archivo_excel" id="archivo_excel" accept=".xlsx, .xls" required class="hidden" <?= empty($periodos) ? 'disabled' : '' ?>>
                     <div class="flex flex-col items-center justify-center space-y-3">
-                        <div class="w-14 h-14 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl shadow-inner">
-                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <div class="w-14 h-14 rounded-full bg-emerald-100 text-udl-green flex items-center justify-center text-2xl shadow-inner">
+                            <i class="fa-solid fa-file-excel"></i>
                         </div>
                         <div>
                             <span class="text-sm font-semibold text-slate-700">Arrastre su archivo aquí o </span>
-                            <span class="text-sm font-bold text-indigo-600 hover:underline">examine en su equipo</span>
+                            <span class="text-sm font-bold text-udl-green hover:underline">examine en su equipo</span>
                         </div>
                         <p id="fileDetails" class="text-xs text-slate-500 font-mono">Archivos soportados: Microsoft Excel (.xlsx, .xls)</p>
                     </div>
@@ -83,7 +99,7 @@ $periodos = $data['periodos'] ?? [];
 
             <!-- Submit Button -->
             <div class="pt-2">
-                <button type="submit" id="btnSubmit" class="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 font-semibold shadow-md shadow-indigo-600/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" id="btnSubmit" <?= empty($periodos) ? 'disabled' : '' ?> class="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-3 rounded-lg text-white bg-[#007547] hover:bg-[#0f392b] font-bold text-sm shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                     <i class="fa-solid fa-play text-xs"></i>
                     <span>Iniciar Importación y Cálculo Estadístico</span>
                 </button>
@@ -94,13 +110,13 @@ $periodos = $data['periodos'] ?? [];
         <div id="progressContainer" class="mt-8 pt-6 border-t border-slate-200 hidden">
             <div class="flex items-center justify-between mb-2">
                 <span id="progressStatus" class="text-xs font-semibold text-slate-700 flex items-center space-x-2">
-                    <i class="fa-solid fa-spinner animate-spin text-indigo-600"></i>
+                    <i class="fa-solid fa-spinner animate-spin text-udl-green"></i>
                     <span>Procesando archivo... Por favor espere.</span>
                 </span>
-                <span id="progressPercent" class="text-xs font-bold text-indigo-600">0%</span>
+                <span id="progressPercent" class="text-xs font-bold text-udl-green">0%</span>
             </div>
             <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
-                <div id="progressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                <div id="progressBar" class="bg-udl-green h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
             <p class="text-[11px] text-slate-400 mt-2 text-center">
                 El sistema lee el archivo en memoria, vincula directores por clave de grupo y computa rankings y desviaciones estándar.
@@ -114,7 +130,7 @@ $periodos = $data['periodos'] ?? [];
                     <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
                     <span>Resultado del Procesamiento</span>
                 </h3>
-                <a id="btnVerResultados" href="<?= htmlspecialchars(url('reportes')) ?>" class="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-lg shadow-sm transition">
+                <a id="btnVerResultados" href="<?= htmlspecialchars(url('reportes')) ?>" class="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-[#007547] hover:bg-[#0f392b] px-4 py-2 rounded-lg shadow-sm transition">
                     <span>Ver Resultados y Rankings</span>
                     <i class="fa-solid fa-arrow-right text-[10px]"></i>
                 </a>
@@ -177,25 +193,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Drag and drop events
     if (dropzone && fileInput) {
-        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('click', () => {
+            if (!fileInput.disabled) fileInput.click();
+        });
 
         ['dragenter', 'dragover'].forEach(eventName => {
             dropzone.addEventListener(eventName, (e) => {
                 e.preventDefault();
-                dropzone.classList.add('border-indigo-500', 'bg-indigo-50/40');
+                dropzone.classList.add('border-udl-green', 'bg-emerald-50/40');
             }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
             dropzone.addEventListener(eventName, (e) => {
                 e.preventDefault();
-                dropzone.classList.remove('border-indigo-500', 'bg-indigo-50/40');
+                dropzone.classList.remove('border-udl-green', 'bg-emerald-50/40');
             }, false);
         });
 
         dropzone.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
-            if (dt && dt.files && dt.files.length) {
+            if (dt && dt.files && dt.files.length && !fileInput.disabled) {
                 fileInput.files = dt.files;
                 updateFileLabel();
             }
@@ -208,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fileInput.files && fileInput.files.length > 0) {
             const f = fileInput.files[0];
             const sizeMb = (f.size / (1024 * 1024)).toFixed(2);
-            fileDetails.innerHTML = `<strong class="text-indigo-600">${f.name}</strong> (${sizeMb} MB)`;
+            fileDetails.innerHTML = `<strong class="text-udl-green">${f.name}</strong> (${sizeMb} MB)`;
         } else {
             fileDetails.textContent = 'Archivos soportados: Microsoft Excel (.xlsx, .xls)';
         }
@@ -219,8 +237,12 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
 
         const periodoSelect = document.getElementById('id_periodo');
-        const selectedPeriodo = periodoSelect.value;
+        if (!periodoSelect) {
+            showAlert('No hay periodos disponibles para importación.', 'warning');
+            return;
+        }
 
+        const selectedPeriodo = periodoSelect.value;
         if (!selectedPeriodo) {
             showAlert('Por favor seleccione un periodo de evaluación.', 'warning');
             return;
@@ -231,15 +253,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Confirmation warning
-        const confirmMsg = `¿Está seguro de procesar las encuestas para el periodo ${selectedPeriodo}? Si ya existen respuestas previas, los cálculos serán recalculados.`;
+        const confirmMsg = `¿Está seguro de procesar las encuestas para el periodo ${selectedPeriodo}?`;
         if (!confirm(confirmMsg)) {
             return;
         }
 
         const formData = new FormData(form);
 
-        // UI Feedback: Start progress
         btnSubmit.disabled = true;
         progressContainer.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
@@ -248,15 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         progressBar.style.width = '30%';
         progressPercent.textContent = '30%';
-        progressStatus.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-indigo-600 mr-2"></i> Subiendo archivo al servidor...';
+        progressStatus.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-udl-green mr-2"></i> Subiendo archivo al servidor...';
 
         try {
-            // Simulated progress tick while server computes
             setTimeout(() => {
                 if (progressBar.style.width === '30%') {
                     progressBar.style.width = '65%';
                     progressPercent.textContent = '65%';
-                    progressStatus.innerHTML = '<i class="fa-solid fa-cog animate-spin text-indigo-600 mr-2"></i> Analizando respuestas y calculando rankings...';
+                    progressStatus.innerHTML = '<i class="fa-solid fa-gear animate-spin text-udl-green mr-2"></i> Analizando respuestas y calculando rankings...';
                 }
             }, 800);
 
@@ -276,7 +295,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Success display
             progressStatus.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500 mr-2"></i> Proceso completado exitosamente';
             showAlert(result.message || 'Importación completada con éxito.', 'success');
 
@@ -298,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Configure button to view reports
             btnVerResultados.href = `index.php?route=reportes&id_periodo=${encodeURIComponent(selectedPeriodo)}`;
             resultsContainer.classList.remove('hidden');
 

@@ -19,3 +19,5 @@ config/db.local.php
 setup_local.php
 R1 Directiva 2026-3 Avanzados (respuestas).xlsx
 u665136406_evaluaciondir.sql
+iniciar_servidor.bat
+/storage/

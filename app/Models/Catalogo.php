@@ -113,7 +113,7 @@ class Catalogo
      */
     public static function getAllLicenciaturas(PDO $pdo): array
     {
-        $stmt = $pdo->query('SELECT id_licenciatura, nombre FROM licenciaturas ORDER BY nombre ASC');
+        $stmt = $pdo->query('SELECT id_licenciatura, nombre, nomenclatura FROM licenciaturas ORDER BY nombre ASC');
         return $stmt->fetchAll();
     }
 
@@ -127,13 +127,17 @@ class Catalogo
             return null;
         }
 
-        // 1. Coincidencia directa exacta
+        // 1. Coincidencia directa exacta por nombre o nomenclatura oficial
         $stmt = $pdo->prepare(
             'SELECT id_licenciatura FROM licenciaturas 
              WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(:nombre)) 
+                OR LOWER(TRIM(COALESCE(nomenclatura, ""))) = LOWER(TRIM(:nomenclatura))
              LIMIT 1'
         );
-        $stmt->execute([':nombre' => $clean]);
+        $stmt->execute([
+            ':nombre'       => $clean,
+            ':nomenclatura' => $clean,
+        ]);
         $id = $stmt->fetchColumn();
         if ($id !== false) {
             return (int)$id;
@@ -142,13 +146,15 @@ class Catalogo
         // 2. Mapeos de alias comunes en las encuestas
         $lower = mb_strtolower($clean, 'UTF-8');
         if ($lower === 'turismo') {
-            $stmt->execute([':nombre' => 'Turismo de Negocios']);
-            $idTurismo = $stmt->fetchColumn();
+            $stmtAlias = $pdo->prepare('SELECT id_licenciatura FROM licenciaturas WHERE LOWER(TRIM(nombre)) = :alias LIMIT 1');
+            $stmtAlias->execute([':alias' => 'turismo de negocios']);
+            $idTurismo = $stmtAlias->fetchColumn();
             if ($idTurismo !== false) return (int)$idTurismo;
         }
         if (str_contains($lower, 'electromecanica') || str_contains($lower, 'electromecánica')) {
-            $stmt->execute([':nombre' => 'Ingeniería Electromecánica Industrial']);
-            $idElectro = $stmt->fetchColumn();
+            $stmtAlias2 = $pdo->prepare('SELECT id_licenciatura FROM licenciaturas WHERE LOWER(TRIM(nombre)) = :alias LIMIT 1');
+            $stmtAlias2->execute([':alias' => 'ingeniería electromecánica industrial']);
+            $idElectro = $stmtAlias2->fetchColumn();
             if ($idElectro !== false) return (int)$idElectro;
         }
 
@@ -190,6 +196,7 @@ class Catalogo
                     p.nombre AS plantel_nombre,
                     p.id_region,
                     l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura,
                     r.nombre AS region_nombre
                 FROM directores d
                 LEFT JOIN planteles p ON d.id_plantel = p.id_plantel
@@ -220,6 +227,7 @@ class Catalogo
                     p.nombre AS plantel_nombre,
                     p.id_region,
                     l.nombre AS licenciatura_nombre,
+                    l.nomenclatura AS licenciatura_nomenclatura,
                     r.nombre AS region_nombre
                 FROM directores d
                 LEFT JOIN planteles p ON d.id_plantel = p.id_plantel
@@ -235,58 +243,67 @@ class Catalogo
     /**
      * Busca el ID del director activo correspondiente al plantel, licenciatura y turno consolidado.
      *
+    /**
+     * Busca el ID del director activo correspondiente al plantel, licenciatura y turno consolidado.
+     */
     public static function findDirector(PDO $pdo, int $plantelId, int $licenciaturaId, string $turnoEstudiante): ?int
     {
         $turno = strtoupper(trim($turnoEstudiante));
 
-        // 1. Intentar buscar por turno exacto (M, V, D, N, T)
-        $sqlExact = "SELECT id_director FROM directores 
-                     WHERE id_plantel = :id_plantel 
-                       AND id_licenciatura = :id_licenciatura 
-                       AND turno = :turno 
+        // Determinar turnos directos compatibles para el estudiante:
+        // Estudiante M o D -> Busca primero M, luego D
+        // Estudiante V o N -> Busca primero V, luego N
+        $turnosBuscados = match ($turno) {
+            'M' => ['M', 'D'],
+            'D' => ['D', 'M'],
+            'V' => ['V', 'N'],
+            'N' => ['N', 'V'],
+            default => [$turno],
+        };
+
+        // 1. Buscar coincidencia en turnos específicos
+        $inPlaceholders = implode(',', array_fill(0, count($turnosBuscados), '?'));
+        $sqlTurno = "SELECT id_director FROM directores 
+                     WHERE id_plantel = ? 
+                       AND id_licenciatura = ? 
+                       AND turno IN ($inPlaceholders) 
                        AND estatus = 'ACTIVO' 
+                     ORDER BY FIELD(turno, " . implode(',', array_map(fn($t) => "'$t'", $turnosBuscados)) . ") 
                      LIMIT 1";
-        $stmt = $pdo->prepare($sqlExact);
-        $stmt->execute([
-            ':id_plantel'      => $plantelId,
-            ':id_licenciatura' => $licenciaturaId,
-            ':turno'           => $turno,
-        ]);
+
+        $params = array_merge([$plantelId, $licenciaturaId], $turnosBuscados);
+        $stmt = $pdo->prepare($sqlTurno);
+        $stmt->execute($params);
         $val = $stmt->fetchColumn();
         if ($val !== false) {
             return (int)$val;
         }
 
-        // 2. Si es turno Matutino/Diurno o Vespertino/Nocturno, buscar el turno hermano correspondiente
-        $siblingTurno = match ($turno) {
-            'M' => 'D',
-            'D' => 'M',
-            'V' => 'N',
-            'N' => 'V',
-            default => null,
-        };
-
-        if ($siblingTurno !== null) {
-            $stmt->execute([
-                ':id_plantel'      => $plantelId,
-                ':id_licenciatura' => $licenciaturaId,
-                ':turno'           => $siblingTurno,
-            ]);
-            $valSibling = $stmt->fetchColumn();
-            if ($valSibling !== false) {
-                return (int)$valSibling;
-            }
-        }
-
-        // 3. Si no hay director específico, buscar director asignado a 'T' (Todas)
-        $stmt->execute([
-            ':id_plantel'      => $plantelId,
-            ':id_licenciatura' => $licenciaturaId,
-            ':turno'           => 'T',
-        ]);
-        $valTodas = $stmt->fetchColumn();
+        // 2. Si no hay director específico, buscar director asignado a 'T' (Todas)
+        $sqlTodas = "SELECT id_director FROM directores 
+                     WHERE id_plantel = ? 
+                       AND id_licenciatura = ? 
+                       AND turno = 'T' 
+                       AND estatus = 'ACTIVO' 
+                     LIMIT 1";
+        $stmtTodas = $pdo->prepare($sqlTodas);
+        $stmtTodas->execute([$plantelId, $licenciaturaId]);
+        $valTodas = $stmtTodas->fetchColumn();
         if ($valTodas !== false) {
             return (int)$valTodas;
+        }
+
+        // 3. Fallback final: Si la carrera tiene director activo en el plantel sin importar el turno, vincularlo
+        $sqlFallback = "SELECT id_director FROM directores 
+                        WHERE id_plantel = ? 
+                          AND id_licenciatura = ? 
+                          AND estatus = 'ACTIVO' 
+                        LIMIT 1";
+        $stmtFb = $pdo->prepare($sqlFallback);
+        $stmtFb->execute([$plantelId, $licenciaturaId]);
+        $valFb = $stmtFb->fetchColumn();
+        if ($valFb !== false) {
+            return (int)$valFb;
         }
 
         return null;

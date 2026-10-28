@@ -7,6 +7,7 @@ use App\Core\Security;
 use App\Models\Catalogo;
 use App\Models\Periodo;
 use App\Models\Respuesta;
+use App\Services\PdfGeneratorService;
 use App\Services\StatisticsService;
 use PDO;
 
@@ -28,7 +29,8 @@ class PeriodoController
 
         $periodos = Periodo::getAll($this->pdo);
         $directoresActivos = Catalogo::getDirectoresActivos($this->pdo);
-        $ultimoPeriodo = !empty($periodos) ? (string)($periodos[0]['id_periodo'] ?? 'N/A') : 'Sin periodos';
+        $periodoActivo = Periodo::getActivo($this->pdo);
+        $ultimoPeriodo = $periodoActivo ? (string)$periodoActivo['id_periodo'] : (!empty($periodos) ? (string)($periodos[0]['id_periodo'] ?? 'N/A') : 'Sin periodos');
 
         $pageTitle = 'Panel Principal - Evaluación Directiva';
         $data = [
@@ -65,7 +67,7 @@ class PeriodoController
     }
 
     /**
-     * Crea un nuevo periodo de evaluación.
+     * Crea un nuevo periodo de evaluación (se marca automáticamente como el único ACTIVO).
      */
     public function crear(): void
     {
@@ -106,13 +108,49 @@ class PeriodoController
 
             $creado = Periodo::create($this->pdo, $idPeriodo);
             if ($creado) {
-                $_SESSION['flash_success'] = "El periodo '{$idPeriodo}' fue creado exitosamente.";
+                $_SESSION['flash_success'] = "El periodo '{$idPeriodo}' fue creado y establecido como el único ciclo ACTIVO.";
             } else {
                 $_SESSION['flash_error'] = 'No fue posible crear el periodo. Inténtelo más tarde.';
             }
         } catch (\Throwable $e) {
             error_log('Error al crear periodo: ' . $e->getMessage());
             $_SESSION['flash_error'] = 'Error al procesar la solicitud: ' . $e->getMessage();
+        }
+
+        Security::redirect('periodos');
+    }
+
+    /**
+     * Activa un periodo existente y desactiva todos los demás.
+     */
+    public function activar(): void
+    {
+        Security::requireAuth();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        $csrfToken = (string)($_POST['csrf_token'] ?? '');
+        if (!Security::validateCsrfToken($csrfToken)) {
+            $_SESSION['flash_error'] = 'Token de seguridad inválido.';
+            Security::redirect('periodos');
+            return;
+        }
+
+        $idPeriodo = trim((string)($_POST['id_periodo'] ?? ''));
+        if ($idPeriodo === '') {
+            $_SESSION['flash_error'] = 'Identificador de periodo no especificado.';
+            Security::redirect('periodos');
+            return;
+        }
+
+        try {
+            Periodo::setActivo($this->pdo, $idPeriodo);
+            $_SESSION['flash_success'] = "El periodo '{$idPeriodo}' ahora es el único periodo ACTIVO.";
+        } catch (\Throwable $e) {
+            error_log('Error al activar periodo: ' . $e->getMessage());
+            $_SESSION['flash_error'] = 'Error al activar el periodo: ' . $e->getMessage();
         }
 
         Security::redirect('periodos');
@@ -218,5 +256,31 @@ class PeriodoController
                 'message' => 'Error al calcular la comparativa: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Genera y descarga el PDF de la Comparativa entre Periodos
+     */
+    public function pdfComparativa(): void
+    {
+        Security::requireAuth();
+
+        $periodo1 = trim((string)($_GET['periodo1'] ?? ''));
+        $periodo2 = trim((string)($_GET['periodo2'] ?? ''));
+
+        if ($periodo1 === '' || $periodo2 === '') {
+            $_SESSION['flash_error'] = 'Debe seleccionar dos periodos para generar el reporte de comparativa.';
+            header('Location: ' . url('comparativa'));
+            exit;
+        }
+
+        if ($periodo1 === $periodo2) {
+            $_SESSION['flash_error'] = 'Debe seleccionar periodos diferentes para contrastar.';
+            header('Location: ' . url('comparativa'));
+            exit;
+        }
+
+        $pdfService = new PdfGeneratorService($this->pdo);
+        $pdfService->generateComparativaReport($periodo1, $periodo2);
     }
 }
